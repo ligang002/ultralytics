@@ -672,6 +672,7 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
 
     if verbose:
         LOGGER.info(f"\n{'':>3}{'from':>20}{'n':>3}{'params':>10}  {'module':<45}{'arguments':<30}")
+    # ch 存储每个layer的输入通道数
     ch = [ch]
     layers, save, c2 = [], [], ch[-1]  # layers, savelist, ch out
     for i, (f, n, m, args) in enumerate(d['backbone'] + d['head']):  # from, number, module, args
