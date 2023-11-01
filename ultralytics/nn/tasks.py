@@ -11,6 +11,8 @@ from ultralytics.nn.modules import (AIFI, C1, C2, C3, C3TR, SPP, SPPF, Bottlenec
                                     Classify, Concat, Conv, Conv2, ConvTranspose, Detect, DWConv, DWConvTranspose2d,
                                     Focus, GhostBottleneck, GhostConv, HGBlock, HGStem, Pose, RepC3, RepConv,
                                     RTDETRDecoder, Segment)
+from ultralytics.nn.modules_self.attention.CBAM import CBAMAttention
+from ultralytics.nn.modules_self.attention.SE import SEAttention
 from ultralytics.utils import DEFAULT_CFG_DICT, DEFAULT_CFG_KEYS, LOGGER, colorstr, emojis, yaml_load
 from ultralytics.utils.checks import check_requirements, check_suffix, check_yaml
 from ultralytics.utils.loss import v8ClassificationLoss, v8DetectionLoss, v8PoseLoss, v8SegmentationLoss
@@ -224,9 +226,9 @@ class DetectionModel(BaseModel):
         super().__init__()
         self.yaml = cfg if isinstance(cfg, dict) else yaml_model_load(cfg)  # cfg dict
 
-        # Define model
+        # Define model 可在yaml中配置初始输入通道，默认为3通道
         ch = self.yaml['ch'] = self.yaml.get('ch', ch)  # input channels
-        if nc and nc != self.yaml['nc']:
+        if nc and nc != self.yaml['nc']:  # yolov8.yaml中的 nc 优先级低，当此处传入 nc 时，覆盖掉yaml中的nc
             LOGGER.info(f"Overriding model.yaml nc={self.yaml['nc']} with nc={nc}")
             self.yaml['nc'] = nc  # override YAML value
         self.model, self.save = parse_model(deepcopy(self.yaml), ch=ch, verbose=verbose)  # model, savelist
@@ -656,12 +658,12 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
 
     # Args
     max_channels = float('inf')
-    nc, act, scales = (d.get(x) for x in ('nc', 'activation', 'scales'))
+    nc, act, scales = (d.get(x) for x in ('nc', 'activation', 'scales'))  # 获取yaml中的nc act scales
     depth, width, kpt_shape = (d.get(x, 1.0) for x in ('depth_multiple', 'width_multiple', 'kpt_shape'))
     if scales:
         scale = d.get('scale')
         if not scale:
-            scale = tuple(scales.keys())[0]
+            scale = tuple(scales.keys())[0]  # 当不传入 scale 时，默认为 n 模型
             LOGGER.warning(f"WARNING ⚠️ no model scale passed. Assuming scale='{scale}'.")
         depth, width, max_channels = scales[scale]
 
@@ -673,19 +675,19 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
     if verbose:
         LOGGER.info(f"\n{'':>3}{'from':>20}{'n':>3}{'params':>10}  {'module':<45}{'arguments':<30}")
     # ch 存储每个layer的输入通道数
-    ch = [ch]
+    ch = [ch]  # 第一次一般为 3 通道
     layers, save, c2 = [], [], ch[-1]  # layers, savelist, ch out
     for i, (f, n, m, args) in enumerate(d['backbone'] + d['head']):  # from, number, module, args
         m = getattr(torch.nn, m[3:]) if 'nn.' in m else globals()[m]  # get module
         for j, a in enumerate(args):
             if isinstance(a, str):
-                with contextlib.suppress(ValueError):
+                with contextlib.suppress(ValueError):  # 在这个上下文中，如果发生 ValueError 异常，将会被忽略
                     args[j] = locals()[a] if a in locals() else ast.literal_eval(a)
 
-        n = n_ = max(round(n * depth), 1) if n > 1 else n  # depth gain
+        n = n_ = max(round(n * depth), 1) if n > 1 else n  # depth gain  如果重复次数大于1则缩放模块重复次数，并且重复次数最小为1；如果重复系数为1，不操作
         if m in (Classify, Conv, ConvTranspose, GhostConv, Bottleneck, GhostBottleneck, SPP, SPPF, DWConv, Focus,
                  BottleneckCSP, C1, C2, C2f, C3, C3TR, C3Ghost, nn.ConvTranspose2d, DWConvTranspose2d, C3x, RepC3):
-            c1, c2 = ch[f], args[0]
+            c1, c2 = ch[f], args[0]  # c1为layer的输入通道数，c2为layer的输出通道数，但是得通过 width 调整
             if c2 != nc:  # if c2 not equal to number of classes (i.e. for Classify() output)
                 c2 = make_divisible(min(c2, max_channels) * width, 8)
 
@@ -712,6 +714,11 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
                 args[2] = make_divisible(min(args[2], max_channels) * width, 8)
         elif m is RTDETRDecoder:  # special case, channels arg must be passed in index 1
             args.insert(1, [ch[x] for x in f])
+        # 个人添加注意力机制
+        elif m in (SEAttention, CBAMAttention):
+            c2 = ch[f]  # 取最后一个输出
+            args = [c2, *args]
+
         else:
             c2 = ch[f]
 
@@ -780,7 +787,7 @@ def guess_model_task(model):
     """
 
     def cfg2task(cfg):
-        """Guess from YAML dictionary."""
+        """[[15, 18, 21], 1, Detect, [nc]] 取的是 Detect"""
         m = cfg['head'][-1][-2].lower()  # output module name
         if m in ('classify', 'classifier', 'cls', 'fc'):
             return 'classify'
