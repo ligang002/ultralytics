@@ -127,7 +127,7 @@ class Model(nn.Module):
         """
         cfg_dict = yaml_model_load(cfg)
         self.cfg = cfg
-        self.task = task or guess_model_task(cfg_dict)
+        self.task = task or guess_model_task(cfg_dict)  # 通过YAML(yolov8.yaml)文件的最后一层猜测模型task的类型
         self.model = (model or self._smart_load('model'))(cfg_dict, verbose=verbose and RANK == -1)  # build model
         self.overrides['model'] = self.cfg
         self.overrides['task'] = self.task
@@ -326,10 +326,10 @@ class Model(nn.Module):
                 LOGGER.warning('WARNING ⚠️ using HUB training arguments, ignoring local training arguments.')
             kwargs = self.session.train_args
         checks.check_pip_update_available()
-
+        # 加载hyp.yaml中的信息
         overrides = yaml_load(checks.check_yaml(kwargs['cfg'])) if kwargs.get('cfg') else self.overrides
-        custom = {'data': TASK2DATA[self.task]}  # method defaults
-        args = {**overrides, **custom, **kwargs, 'mode': 'train'}  # highest priority args on the right
+        custom = {'data': TASK2DATA[self.task]}  # 默认的数据集格式，都为coco的格式
+        args = {**overrides, **custom, **kwargs, 'mode': 'train'}  # 右侧的参数有更高的优先级， kwargs为在命令行传入的参数
         if args.get('resume'):
             args['resume'] = self.ckpt_path
 
