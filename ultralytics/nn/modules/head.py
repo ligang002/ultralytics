@@ -19,29 +19,35 @@ __all__ = 'Detect', 'Segment', 'Pose', 'Classify', 'RTDETRDecoder'
 
 class Detect(nn.Module):
     """YOLOv8 Detect head for detection models."""
-    dynamic = False  # force grid reconstruction
-    export = False  # export mode
+    dynamic = False  # 强制网格重建
+    export = False  # 导出模式
     shape = None
-    anchors = torch.empty(0)  # init
-    strides = torch.empty(0)  # init
+    anchors = torch.empty(0)  # 初始化锚点
+    strides = torch.empty(0)  # 初始化步长
 
     def __init__(self, nc=80, ch=()):
-        """Initializes the YOLOv8 detection layer with specified number of classes and channels."""
+        """
+            Initializes the YOLOv8 detection layer with specified number of classes and channels.
+            用指定的类别数和通道数初始化YOLOv8检测层.
+        """
         super().__init__()
-        self.nc = nc  # number of classes
-        self.nl = len(ch)  # number of detection layers
+        self.nc = nc  # 类别数
+        self.nl = len(ch)  # detection layers 的数量
         self.reg_max = 16  # DFL channels (ch[0] // 16 to scale 4/8/12/16/20 for n/s/m/l/x)
-        self.no = nc + self.reg_max * 4  # number of outputs per anchor
-        self.stride = torch.zeros(self.nl)  # strides computed during build
+        self.no = nc + self.reg_max * 4  # 每个锚点的输出数, 包含类别数和位置信息
+        self.stride = torch.zeros(self.nl)  # 在构建过程中计算得到的步长
         c2, c3 = max((16, ch[0] // 4, self.reg_max * 4)), max(ch[0], min(self.nc, 100))  # channels
         self.cv2 = nn.ModuleList(
-            nn.Sequential(Conv(x, c2, 3), Conv(c2, c2, 3), nn.Conv2d(c2, 4 * self.reg_max, 1)) for x in ch)
-        self.cv3 = nn.ModuleList(nn.Sequential(Conv(x, c3, 3), Conv(c3, c3, 3), nn.Conv2d(c3, self.nc, 1)) for x in ch)
+            nn.Sequential(Conv(x, c2, 3), Conv(c2, c2, 3), nn.Conv2d(c2, 4 * self.reg_max, 1)) for x in ch)  # 预测每个锚点的位置信息
+        self.cv3 = nn.ModuleList(nn.Sequential(Conv(x, c3, 3), Conv(c3, c3, 3), nn.Conv2d(c3, self.nc, 1)) for x in ch)  # 预测每个锚点的类别信息
         self.dfl = DFL(self.reg_max) if self.reg_max > 1 else nn.Identity()
 
     def forward(self, x):
-        """Concatenates and returns predicted bounding boxes and class probabilities."""
-        shape = x[0].shape  # BCHW
+        """
+            Concatenates and returns predicted bounding boxes and class probabilities.
+            连接并返回预测的边界框和类别概率.
+        """
+        shape = x[0].shape  # BCHW5
         for i in range(self.nl):
             x[i] = torch.cat((self.cv2[i](x[i]), self.cv3[i](x[i])), 1)
         if self.training:
@@ -51,7 +57,7 @@ class Detect(nn.Module):
             self.shape = shape
 
         x_cat = torch.cat([xi.view(shape[0], self.no, -1) for xi in x], 2)
-        if self.export and self.format in ('saved_model', 'pb', 'tflite', 'edgetpu', 'tfjs'):  # avoid TF FlexSplitV ops
+        if self.export and self.format in ('saved_model', 'pb', 'tflite', 'edgetpu', 'tfjs'):  # 避免使用TF FlexSplitV操作
             box = x_cat[:, :self.reg_max * 4]
             cls = x_cat[:, self.reg_max * 4:]
         else:
@@ -59,9 +65,9 @@ class Detect(nn.Module):
         dbox = dist2bbox(self.dfl(box), self.anchors.unsqueeze(0), xywh=True, dim=1) * self.strides
 
         if self.export and self.format in ('tflite', 'edgetpu'):
-            # Normalize xywh with image size to mitigate quantization error of TFLite integer models as done in YOLOv5:
+            # 将xywh归一化为图像尺寸，以减轻TFLite整数模型的量化误差，与YOLOv5中的处理方式相同:
             # https://github.com/ultralytics/yolov5/blob/0c8de3fca4a702f8ff5c435e67f378d1fce70243/models/tf.py#L307-L309
-            # See this PR for details: https://github.com/ultralytics/ultralytics/pull/1695
+            # 有关详细信息，请参阅此PR: https://github.com/ultralytics/ultralytics/pull/1695
             img_h = shape[2] * self.stride[0]
             img_w = shape[3] * self.stride[0]
             img_size = torch.tensor([img_w, img_h, img_w, img_h], device=dbox.device).reshape(1, 4, 1)
@@ -71,7 +77,10 @@ class Detect(nn.Module):
         return y if self.export else (y, x)
 
     def bias_init(self):
-        """Initialize Detect() biases, WARNING: requires stride availability."""
+        """
+            Initialize Detect() biases, WARNING: requires stride availability.
+            初始化Detect()的偏置，警告：需要有步长可用.
+        """
         m = self  # self.model[-1]  # Detect() module
         # cf = torch.bincount(torch.tensor(np.concatenate(dataset.labels, 0)[:, 0]).long(), minlength=nc) + 1
         # ncf = math.log(0.6 / (m.nc - 0.999999)) if cf is None else torch.log(cf / cf.sum())  # nominal class frequency
