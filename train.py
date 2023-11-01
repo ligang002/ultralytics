@@ -27,7 +27,7 @@ def transformer_opt(opt):
 def parse_opt():
     parser = argparse.ArgumentParser()
     
-    parser.add_argument('--yaml', type=str, default='ultralytics/cfg/models/v8/yolov8n.yaml', help='model.yaml path')
+    parser.add_argument('--yaml', type=str, default='ultralytics/cfg/models/v8/det_self/yolov8-attention-SE.yaml', help='model.yaml path')
     parser.add_argument('--weight', type=str, default='', help='pretrained model path')
     parser.add_argument('--cfg', type=str, default='hyp.yaml', help='hyperparameters path')
     parser.add_argument('--data', type=str, default='./datasets/coco128.yaml', help='data yaml path')
