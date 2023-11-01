@@ -326,7 +326,14 @@ def scale_img(img, ratio=1.0, same_shape=False, gs=32):
 
 
 def make_divisible(x, divisor):
-    """Returns nearest x divisible by divisor."""
+    """
+        Returns nearest x divisible by divisor.
+        将输入 x 调整为最接近且可被 divisor 整除的值。
+        math.ceil() 函数用于向上取整
+        eg: 一个输入 x 为 37，我们希望将其调整为最接近且可被 8 整除的值。
+        37 除以 8 得到 4.625。然后使用 math.ceil() 函数向上取整为 5，最后乘以 8 得到最接近且可被 8 整除的值 40。
+
+    """
     if isinstance(divisor, torch.Tensor):
         divisor = int(divisor.max())  # to int
     return math.ceil(x / divisor) * divisor
