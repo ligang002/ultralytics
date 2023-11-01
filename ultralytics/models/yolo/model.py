@@ -9,7 +9,7 @@ class YOLO(Model):
     """YOLO (You Only Look Once) object detection model."""
 
     @property
-    def task_map(self):
+    def task_map(self):  # 重写Model类中task_map方法
         """Map head to model, trainer, validator, and predictor classes."""
         return {
             'classify': {
