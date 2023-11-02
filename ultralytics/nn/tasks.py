@@ -11,8 +11,11 @@ from ultralytics.nn.modules import (AIFI, C1, C2, C3, C3TR, SPP, SPPF, Bottlenec
                                     Classify, Concat, Conv, Conv2, ConvTranspose, Detect, DWConv, DWConvTranspose2d,
                                     Focus, GhostBottleneck, GhostConv, HGBlock, HGStem, Pose, RepC3, RepConv,
                                     RTDETRDecoder, Segment)
+from ultralytics.nn.modules_self.attention.A2Attention import DoubleAttention
+from ultralytics.nn.modules_self.attention.CA import CAAttention
 from ultralytics.nn.modules_self.attention.CBAM import CBAMAttention
 from ultralytics.nn.modules_self.attention.SE import SEAttention
+from ultralytics.nn.modules_self.attention.ECA import ECAAttention  # 此处必须得导入
 from ultralytics.utils import DEFAULT_CFG_DICT, DEFAULT_CFG_KEYS, LOGGER, colorstr, emojis, yaml_load
 from ultralytics.utils.checks import check_requirements, check_suffix, check_yaml
 from ultralytics.utils.loss import v8ClassificationLoss, v8DetectionLoss, v8PoseLoss, v8SegmentationLoss
@@ -715,7 +718,7 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
         elif m is RTDETRDecoder:  # special case, channels arg must be passed in index 1
             args.insert(1, [ch[x] for x in f])
         # 个人添加注意力机制
-        elif m in (SEAttention, CBAMAttention):
+        elif m in (SEAttention, CBAMAttention, CAAttention, DoubleAttention):
             c2 = ch[f]  # 取最后一个输出
             args = [c2, *args]
 
@@ -749,7 +752,7 @@ def yaml_model_load(path):
     unified_path = re.sub(r'(\d+)([nslmx])(.+)?$', r'\1\3', str(path))  # i.e. yolov8x.yaml -> yolov8.yaml
     yaml_file = check_yaml(unified_path, hard=False) or check_yaml(path)
     d = yaml_load(yaml_file)  # model dict
-    d['scale'] = guess_model_scale(path)
+    d['scale'] = guess_model_scale(path)  # 通过yolov8x.yaml 的名字进行确定是哪个模型 n s 等
     d['yaml_file'] = str(path)
     return d
 
