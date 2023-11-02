@@ -12,6 +12,7 @@ from ultralytics.nn.modules import (AIFI, C1, C2, C3, C3TR, SPP, SPPF, Bottlenec
                                     Focus, GhostBottleneck, GhostConv, HGBlock, HGStem, Pose, RepC3, RepConv,
                                     RTDETRDecoder, Segment)
 from ultralytics.nn.modules_self.attention.A2Attention import DoubleAttention
+from ultralytics.nn.modules_self.attention.BAM import BAMAttention
 from ultralytics.nn.modules_self.attention.CA import CAAttention
 from ultralytics.nn.modules_self.attention.CBAM import CBAMAttention
 from ultralytics.nn.modules_self.attention.SE import SEAttention
@@ -245,6 +246,8 @@ class DetectionModel(BaseModel):
             m.inplace = self.inplace
             forward = lambda x: self.forward(x)[0] if isinstance(m, (Segment, Pose)) else self.forward(x)
             m.stride = torch.tensor([s / x.shape[-2] for x in forward(torch.zeros(1, ch, s, s))])  # forward
+            # 使用BAM注意力时，使用下面这个
+            # m.stride = torch.tensor([s / x.shape[-2] for x in forward(torch.zeros(2, ch, s, s))])  # forward
             self.stride = m.stride
             m.bias_init()  # only run once
         else:
@@ -718,7 +721,7 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
         elif m is RTDETRDecoder:  # special case, channels arg must be passed in index 1
             args.insert(1, [ch[x] for x in f])
         # 个人添加注意力机制
-        elif m in (SEAttention, CBAMAttention, CAAttention, DoubleAttention):
+        elif m in (SEAttention, CBAMAttention, CAAttention, DoubleAttention, BAMAttention):
             c2 = ch[f]  # 取最后一个输出
             args = [c2, *args]
 
