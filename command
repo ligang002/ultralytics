@@ -9,12 +9,17 @@
     --imgsz:    图片大小
     --unamp:    关闭混合精度
 
-注意力机制：
+
+yolov8默认：
     # 默认yolov8n.yaml
     python ./train.py --yaml ultralytics/cfg/models/v8/yolov8s.yaml --weight yolov8s.pt --cfg hyp.yaml --data ultralytics/cfg/datasets/coco128.yaml --epochs 100 --imgsz 640
 
+修改激活函数：
     # yolov8-act.yaml
     python ./train.py --yaml ultralytics/cfg/models/v8/det_self/yolov8s-act.yaml --weight yolov8s.pt --cfg hyp.yaml --data ultralytics/cfg/datasets/coco128.yaml --epochs 100 --imgsz 640
+
+
+注意力机制：
 
     # yolov8-attention-SE.yaml
     python ./train.py --yaml ultralytics/cfg/models/v8/det_self/yolov8s-attention-SE.yaml --weight yolov8s.pt --cfg hyp.yaml --data ultralytics/cfg/datasets/coco128.yaml --epochs 100 --imgsz 640
@@ -38,6 +43,7 @@
 
 
 
+python ./train.py --yaml ultralytics/cfg/models/v8/det_self/yolov8s-attention-SE.yaml --cfg ultralytics/cfg/hyp_chepai.yaml --data ultralytics/cfg/datasets/VOC_self.yaml
 
 
 
